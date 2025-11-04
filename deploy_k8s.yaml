@@ -1,0 +1,47 @@
+---
+- name: Préparer Debian pour Kubernetes
+  hosts: k8s_master
+  become: yes
+  tasks:
+
+    - name: Mettre à jour la liste des paquets
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Installer les paquets requis
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+
+    - name: Vérifier qu'un utilisateur sudo existe
+      user:
+        name: "{{ ansible_user }}"
+        groups: sudo
+        append: yes
+        state: present
+
+    - name: Désactiver le swap temporairement
+      command: swapoff -a
+
+    - name: Supprimer toute ligne swap dans /etc/fstab pour désactiver au démarrage
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*swap.*)$'
+        replace: '# \1'
+
+    - name: Vérifier que les ports Kubernetes sont ouverts (6443, 2379-2380, 10250-10252)
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - 6443
+        - 2379:2380
+        - 10250:10252
+      when: ansible_facts['os_family'] == 'Debian'
